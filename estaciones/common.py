@@ -167,9 +167,9 @@ class AjusteSARIMAX:
     def graficos_residuos(self, lags= 100):
         
         fig, axes = plt.subplots(1, 2, figsize=(15, 4))
-        plot_acf(self.ajuste.resid[5:], lags=40, ax=axes[0])
+        plot_acf(self.ajuste.resid[5:], lags=lags, ax=axes[0])
         axes[0].set_title("ACF de los Residuos")
-        plot_pacf(self.ajuste.resid[5:], lags=40, ax=axes[1])
+        plot_pacf(self.ajuste.resid[5:], lags=lags, ax=axes[1])
         axes[1].set_title("PACF de los Residuos")
         plt.tight_layout()
         plt.show()       
