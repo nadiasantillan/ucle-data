@@ -1,3 +1,4 @@
+import pandas as pd
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -5,6 +6,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import (RBF, Matern, ConstantKernel,
                                               WhiteKernel, ExpSineSquared, RationalQuadratic)
 from sklearn.metrics import mean_squared_error
+from statsmodels.tsa.stattools import adfuller, acf, pacf
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 
 _AMPLITUD = lambda: ConstantKernel(1., (1e-5, 1))
 _RUIDO = lambda: WhiteKernel(.1, (1e-5, 0.25))
@@ -82,6 +85,34 @@ class VegetacionMedia:
         plt.ylabel('Fila (i)')
         plt.title('Vegetación media')
         plt.colorbar(im)
+        plt.show()
+
+class Autocorrelacion:
+    def __init__(self, tiempo, serie, nombre):
+        self.tiempo = tiempo
+        self.serie = serie
+        self.nombre = nombre    
+        
+    def acf(self, lags=100):
+        acf_v, _ = acf(self.serie, nlags=lags, alpha=0.05)
+        return acf_v
+        
+    def acf_significativos(self, lags=100):
+        acf_v, acf_ci = acf(self.serie, nlags=lags, alpha=0.05)
+        return [(i, round(acf_v[i], 3)) for i in range(1, lags+1)
+            if acf_ci[i, 0] > 0 or acf_ci[i, 1] < 0]
+
+    def pacf_significativos(self, lags=100):        
+        pacf_v, pacf_ci = pacf(self.serie, nlags=lags, alpha=0.05, method="ywm")
+
+        return [(i, round(pacf_v[i], 3)) for i in range(1, lags+1)
+            if pacf_ci[i, 0] > 0 or pacf_ci[i, 1] < 0]
+        
+        
+    def grafico(self, lags=100):
+        fig, ax = plt.subplots(1, 2, figsize=(15, 4))
+        plot_acf(self.serie, lags=lags, ax=ax[0], title=f"ACF {self.nombre}")
+        plot_pacf(self.serie, lags=lags, ax=ax[1], method="ywm", title=f"PACF {self.nombre}")
         plt.show()
         
 class Serie:
@@ -172,29 +203,31 @@ class Ajuste:
             resultados[nombre] = self._modelo(nombre, kernel)
         return resultados
         
-    def validacion(self, kernel, ventana=160, horizonte=10):
+    def validacion_kernels(self, ventana=160, horizonte=10):
         b_serie = np.concatenate([self.b_entrenamiento, self.b_prueba])
         t_serie = np.concatenate([self.t_entrenamiento, self.t_prueba])
         origenes = np.linspace(ventana, len(b_serie)-horizonte, 4, dtype=int)[1:]
         registros = []
-        for origen in origenes:
-            tt = t_serie[origen-ventana:origen]
-            yy = b_serie[origen-ventana:origen]
-            tf = t_serie[origen:origen+horizonte]
-            yf = b_serie[origen:origen+horizonte]
-            
-            modelo = self.ajuste(kernel, tt, yy, restarts=0)
-            _, _, pred, sd =self.estimacion(modelo, tt, yy, tf)
+        for kernel_nombre, kernel in _KERNELS.items():
+            for origen in origenes:
+                tt = t_serie[origen-ventana:origen]
+                yy = b_serie[origen-ventana:origen]
+                tf = t_serie[origen:origen+horizonte]
+                yf = b_serie[origen:origen+horizonte]
+                
+                modelo = self.ajuste(kernel, tt, yy, restarts=0)
+                _, _, pred, sd =self.estimacion(modelo, tt, yy, tf)
 
-            for h, obs, mu_h, sd_h in zip(range(1, horizonte+1), yf, pred, sd):
-                registros.append((h, obs-mu_h, abs(obs-mu_h) <= 1.96*sd_h))
+                for h, obs, mu_h, sd_h in zip(range(1, horizonte+1), yf, pred, sd):
+                    registros.append((kernel_nombre, h, (obs-mu_h)**2, obs-mu_h, abs(obs-mu_h) <= 1.96*sd_h))
 
-        registros = np.asarray(registros)
-        print('Horizonte  RMSE     Cobertura  N')
-        for h in (1, 5, 10):
-            r = registros[registros[:, 0] == h]
-            print(f'{h:8d}  {np.sqrt(np.mean(r[:,1]**2)):.5f}  {np.mean(r[:,2]):7.1%}  {len(r):d}')
-        print('Cobertura total (pocos casos; estimación imprecisa):', f'{registros[:,2].mean():.1%}')        
+        return pd.DataFrame(registros, columns=['kernel', 'horizonte', 'error^2', 'error', 'cobertura'])
+            # registros = np.asarray(registros)
+            # print('Horizonte  RMSE     Cobertura  N')
+            # for h in (1, 5, 10):
+            #     r = registros[registros[:, 0] == h]
+            #     print(f'{h:8d}  {np.sqrt(np.mean(r[:,1]**2)):.5f}  {np.mean(r[:,2]):7.1%}  {len(r):d}')
+            # print('Cobertura total (pocos casos; estimación imprecisa):', f'{registros[:,2].mean():.1%}')        
         
         
     def _modelo(self, nombre, kernel):
