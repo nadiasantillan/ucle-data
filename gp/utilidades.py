@@ -142,6 +142,7 @@ class Ajuste:
         modelo = GaussianProcessRegressor(
             kernel=kernel,
             alpha=1e-8, normalize_y=False, n_restarts_optimizer=restarts, random_state=42)
+        print(f'Ajustando modelo con kernel: {kernel}')
         modelo.fit(t_entrenamiento.reshape(-1, 1)-t_entrenamiento[0], 
                    (y_entrenamiento-y_entrenamiento.mean())/y_entrenamiento.std())
         return modelo
@@ -221,12 +222,6 @@ class Ajuste:
                     registros.append((kernel_nombre, h, (obs-mu_h)**2, obs-mu_h, abs(obs-mu_h) <= 1.96*sd_h))
 
         return pd.DataFrame(registros, columns=['kernel', 'horizonte', 'error^2', 'error', 'cobertura'])
-            # registros = np.asarray(registros)
-            # print('Horizonte  RMSE     Cobertura  N')
-            # for h in (1, 5, 10):
-            #     r = registros[registros[:, 0] == h]
-            #     print(f'{h:8d}  {np.sqrt(np.mean(r[:,1]**2)):.5f}  {np.mean(r[:,2]):7.1%}  {len(r):d}')
-            # print('Cobertura total (pocos casos; estimación imprecisa):', f'{registros[:,2].mean():.1%}')        
         
         
     def _modelo(self, nombre, kernel):
