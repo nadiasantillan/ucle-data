@@ -172,7 +172,6 @@ class Ajuste:
             ls='--',
             label='Fin del entrenamiento'
         )
-        # Media estimada durante el entrenamiento
         ax.plot(self.t_entrenamiento, mu_train, '-', lw=1.8, color='tab:green', label='GP ajustado')
         ax.plot(self.t_prueba, mu_test, '-', lw=1.8, color='tab:red', label='Pronóstico GP')
         ax.fill_between(
@@ -281,3 +280,4 @@ class Ajuste:
     def _y_prueba_normalizado(self):
         return (self.b_prueba - self._y_media_entrenamiento()) / self._y_escala_entrenamiento()
     
+
